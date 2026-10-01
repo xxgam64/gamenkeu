@@ -3,6 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      (function() {
+        try {
+          var _f = window.fetch;
+          Object.defineProperty(window, 'fetch', {
+            get: function() { return _f; },
+            set: function(val) { _f = val; },
+            configurable: true,
+            enumerable: true
+          });
+        } catch (_) {}
+      })();
+    </script>
     <title>GamMenkeu - Sistem Finansial Mandiri</title>
     <meta name="description" content="Sistem finansial mandiri enterprise untuk pencatatan buku kas, analisis anggaran 50/30/20, manajemen portofolio aset, dan perencanaan dana tagihan." />
     <meta property="og:title" content="GamMenkeu - Sistem Finansial Mandiri" />
