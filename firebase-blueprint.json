@@ -1,0 +1,100 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "displayName": { "type": "string", "maxLength": 128 },
+        "photoURL": { "type": "string", "maxLength": 1024 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Financial ledger entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "date": { "type": "string", "maxLength": 32 },
+        "time": { "type": "string", "maxLength": 32 },
+        "title": { "type": "string", "maxLength": 256 },
+        "description": { "type": "string", "maxLength": 512 },
+        "counterparty": { "type": "string", "maxLength": 256 },
+        "account": { "type": "string", "maxLength": 128 },
+        "category": { "type": "string", "maxLength": 128 },
+        "classification": { "type": "string", "maxLength": 64 },
+        "type": { "type": "string", "maxLength": 32 },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "maxLength": 64 },
+        "receiptAttached": { "type": "boolean" },
+        "auditVerified": { "type": "boolean" },
+        "userId": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["id", "date", "title", "amount", "type", "userId"]
+    },
+    "PortfolioAsset": {
+      "title": "PortfolioAsset",
+      "description": "Investment instrument holding",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "code": { "type": "string", "maxLength": 32 },
+        "name": { "type": "string", "maxLength": 256 },
+        "description": { "type": "string", "maxLength": 512 },
+        "category": { "type": "string", "maxLength": 128 },
+        "units": { "type": "number" },
+        "unitLabel": { "type": "string", "maxLength": 64 },
+        "avgBuyPrice": { "type": "number" },
+        "investedCapital": { "type": "number" },
+        "currentValue": { "type": "number" },
+        "currentUnitPrice": { "type": "number" },
+        "unrealizedGain": { "type": "number" },
+        "unrealizedGainPercent": { "type": "number" },
+        "userId": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["id", "code", "name", "investedCapital", "currentValue", "userId"]
+    },
+    "SinkingFund": {
+      "title": "SinkingFund",
+      "description": "Target savings / sinking fund pos",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 256 },
+        "category": { "type": "string", "maxLength": 128 },
+        "targetAmount": { "type": "number" },
+        "currentAmount": { "type": "number" },
+        "dueDate": { "type": "string", "maxLength": 64 },
+        "frequency": { "type": "string", "maxLength": 64 },
+        "holdingAccount": { "type": "string", "maxLength": 128 },
+        "statusNote": { "type": "string", "maxLength": 256 },
+        "monthlyAllocation": { "type": "number" },
+        "userId": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["id", "name", "targetAmount", "currentAmount", "userId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile document"
+    },
+    "/users/{userId}/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "User personal financial transactions"
+    },
+    "/users/{userId}/assets/{assetId}": {
+      "schema": "PortfolioAsset",
+      "description": "User investment assets"
+    },
+    "/users/{userId}/sinkingFunds/{fundId}": {
+      "schema": "SinkingFund",
+      "description": "User sinking funds and savings goals"
+    }
+  }
+}

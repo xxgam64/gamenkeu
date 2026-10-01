@@ -8,6 +8,7 @@ import { UpdateAssetModal } from './components/modals/UpdateAssetModal';
 import { AddAssetModal } from './components/modals/AddAssetModal';
 import { ExportReportModal } from './components/modals/ExportReportModal';
 import { CertificateModal } from './components/modals/CertificateModal';
+import { LoginModal } from './components/modals/LoginModal';
 
 import { FinancialOverviewScreen } from './screens/FinancialOverviewScreen';
 import { CashBookScreen } from './screens/CashBookScreen';
@@ -54,6 +55,7 @@ const MainContent: React.FC = () => {
       </div>
 
       {/* Global Modals */}
+      <LoginModal />
       <TransactionModal />
       <UpdateAssetModal />
       <AddAssetModal />

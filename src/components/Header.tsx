@@ -12,10 +12,14 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileSidebar }) => {
     setCurrentScreen,
     currentScreen,
     showToast,
+    user,
+    logout,
+    setIsLoginModalOpen,
   } = useFinance();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   const notifications = [
     {
@@ -176,21 +180,115 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileSidebar }) => {
           <span className="whitespace-nowrap">Catat Transaksi</span>
         </button>
 
-        {/* User Profile Lockup */}
-        <div
-          onClick={() => setCurrentScreen('akses-akun-premium')}
-          className="flex items-center gap-2.5 pl-2 sm:pl-3 border-l border-[#E2E8F0] cursor-pointer hover:opacity-85 transition-opacity"
-        >
-          <div className="w-8 h-8 rounded-full bg-[#131B2E] text-white flex items-center justify-center font-bold text-[12px] shadow-xs shrink-0">
-            BP
+        {/* Login or User Profile Lockup */}
+        {user ? (
+          <div className="relative">
+            <button
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="flex items-center gap-2.5 pl-2 sm:pl-3 border-l border-[#E2E8F0] hover:opacity-90 transition-opacity text-left"
+              type="button"
+            >
+              {user.photoURL ? (
+                <img
+                  src={user.photoURL}
+                  alt={user.displayName || 'Avatar'}
+                  className="w-8 h-8 rounded-full object-cover ring-2 ring-[#10B981]/30 shrink-0"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-[#131B2E] text-white flex items-center justify-center font-bold text-[12px] shadow-xs shrink-0">
+                  {user.displayName
+                    ? user.displayName.slice(0, 2).toUpperCase()
+                    : user.email
+                    ? user.email.slice(0, 2).toUpperCase()
+                    : 'U'}
+                </div>
+              )}
+              <div className="hidden sm:flex flex-col text-left">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[12.5px] font-semibold text-[#0b1c30] leading-tight truncate max-w-[120px]">
+                    {user.displayName || 'Pengguna'}
+                  </span>
+                  <span className="w-2 h-2 rounded-full bg-[#10B981]" title="Cloud Sync Aktif"></span>
+                </div>
+                <span className="text-[10px] text-slate-400 leading-tight truncate max-w-[120px]">
+                  {user.email || 'Cloud Sync Aktif'}
+                </span>
+              </div>
+              <span className="material-symbols-outlined text-[16px] text-slate-400 hidden sm:inline">
+                expand_more
+              </span>
+            </button>
+
+            {/* User Dropdown Menu */}
+            {showUserMenu && (
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="px-3.5 py-2 border-b border-slate-100">
+                  <p className="text-xs font-bold text-slate-900 truncate">
+                    {user.displayName || 'Pengguna GamMenkeu'}
+                  </p>
+                  <p className="text-[11px] text-slate-500 truncate">{user.email}</p>
+                  <span className="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-[#006C4A] border border-emerald-200">
+                    Firebase Cloud Sync Aktif
+                  </span>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    setCurrentScreen('akses-akun-premium');
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-slate-700 hover:bg-slate-50 font-medium transition-colors text-left"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-slate-400">
+                    manage_accounts
+                  </span>
+                  <span>Kelola Akun & Lisensi</span>
+                </button>
+
+                <div className="border-t border-slate-100 mt-1 pt-1">
+                  <button
+                    onClick={() => {
+                      setShowUserMenu(false);
+                      logout();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-rose-600 hover:bg-rose-50 font-medium transition-colors text-left"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">logout</span>
+                    <span>Keluar Akun (Logout)</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-          <div className="hidden sm:flex flex-col text-left">
-            <span className="text-[12.5px] font-semibold text-[#0b1c30] leading-tight">
-              Budi Pratama
-            </span>
-            <span className="text-[11px] text-slate-400 leading-tight">budi@enterprise.id</span>
+        ) : (
+          <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l border-[#E2E8F0]">
+            <button
+              onClick={() => setIsLoginModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-600 bg-emerald-50 hover:bg-emerald-100 text-[#006C4A] text-[13px] font-semibold transition-all shadow-xs"
+              type="button"
+            >
+              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                <path
+                  fill="#4285F4"
+                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.16 0 9.98 0 12s.45 3.84 1.25 5.42l4.03-3.15z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                />
+              </svg>
+              <span className="whitespace-nowrap">Masuk / Login</span>
+            </button>
           </div>
-        </div>
+        )}
       </div>
     </header>
   );

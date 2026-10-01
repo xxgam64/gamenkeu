@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { useFinance } from '../context/FinanceContext';
 
 export const PremiumAccountScreen: React.FC = () => {
-  const { setIsCertificateModalOpen, setIsExportModalOpen, showToast } = useFinance();
+  const { setIsCertificateModalOpen, setIsExportModalOpen, showToast, user, logout, setIsLoginModalOpen } = useFinance();
   const [copied, setCopied] = useState(false);
-  const licenseKey = 'GM-ENT-2024-94821-X99Q-VAL';
+  const licenseKey = user ? `GM-PRO-${user.uid.slice(0, 8).toUpperCase()}-2024` : 'GM-ENT-2024-94821-X99Q-VAL';
 
   const copyLicenseKey = () => {
     navigator.clipboard.writeText(licenseKey);
@@ -59,33 +59,51 @@ export const PremiumAccountScreen: React.FC = () => {
       <div className="relative overflow-hidden rounded-xl bg-white p-6 shadow-xs border border-[#E2E8F0]/70">
         <div className="relative z-10 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
           <div className="flex items-start sm:items-center gap-4">
-            <div className="w-14 h-14 rounded-xl bg-[#0F172A] text-white flex items-center justify-center shadow-xs shrink-0">
-              <span className="material-symbols-outlined text-[32px] text-[#10B981]">workspace_premium</span>
-            </div>
+            {user?.photoURL ? (
+              <img
+                src={user.photoURL}
+                alt={user.displayName || 'Avatar'}
+                className="w-14 h-14 rounded-xl object-cover ring-2 ring-[#10B981]/30 shrink-0 shadow-xs"
+              />
+            ) : (
+              <div className="w-14 h-14 rounded-xl bg-[#0F172A] text-white flex items-center justify-center shadow-xs shrink-0 font-bold text-xl">
+                {user?.displayName ? user.displayName.slice(0, 2).toUpperCase() : 'GM'}
+              </div>
+            )}
             <div className="flex flex-col">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="font-['Plus_Jakarta_Sans'] text-lg font-bold text-[#0b1c30]">
-                  Budi Pratama
+                  {user ? (user.displayName || 'Pengguna Terverifikasi') : 'Mode Tamu (Lokal)'}
                 </h2>
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-[#006C4A] text-[11px] font-bold border border-emerald-200">
-                  <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                  Lisensi Enterprise Aktif (Verified Lifetime)
-                </span>
+                {user ? (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-[#006C4A] text-[11px] font-bold border border-emerald-200">
+                    <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                    Firebase Cloud Sync Aktif (Multi-User)
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => setIsLoginModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-xs transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">login</span>
+                    Masuk dengan Google
+                  </button>
+                )}
               </div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 mt-1">
                 <span className="flex items-center gap-1">
                   <span className="material-symbols-outlined text-[15px] text-slate-400">mail</span>
-                  budi@enterprise.id
+                  {user?.email || 'Belum masuk akun (Data tersimpan di browser)'}
                 </span>
                 <span>•</span>
                 <span className="flex items-center gap-1">
                   <span className="material-symbols-outlined text-[15px] text-slate-400">tag</span>
-                  ID Pengguna: <span className="font-mono text-slate-800 font-semibold">GM-94821-ENT</span>
+                  ID Pengguna: <span className="font-mono text-slate-800 font-semibold">{user ? user.uid.slice(0, 14) : 'GUEST-LOCAL'}</span>
                 </span>
                 <span>•</span>
                 <span className="flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[15px] text-slate-400">event_available</span>
-                  Terdaftar sejak: Januari 2024
+                  <span className="material-symbols-outlined text-[15px] text-slate-400">cloud</span>
+                  Penyimpanan: {user ? 'Firestore Cloud Mandiri' : 'Local Storage'}
                 </span>
               </div>
             </div>
@@ -463,20 +481,35 @@ export const PremiumAccountScreen: React.FC = () => {
           </div>
 
           <div className="pt-3 border-t border-[#E2E8F0]/60 flex flex-col sm:flex-row items-center justify-between gap-2">
-            <button
-              type="button"
-              onClick={() => showToast('Perangkat Terhubung', 'Seluruh status perangkat telah diverifikasi.', 'info')}
-              className="w-full sm:w-auto px-3 py-2 rounded-lg bg-[#EFF4FF] hover:bg-slate-200 text-slate-800 text-xs font-semibold transition-colors text-center"
-            >
-              Kelola Perangkat Terhubung
-            </button>
-            <button
-              type="button"
-              onClick={() => showToast('Sesi Direset', 'Semua perangkat sekunder telah dicabut aksesnya.')}
-              className="w-full sm:w-auto px-3 py-2 rounded-lg text-[#E11D48] hover:bg-rose-50 text-xs font-semibold transition-colors text-center"
-            >
-              Keluar dari Semua Perangkat
-            </button>
+            {user ? (
+              <>
+                <span className="text-xs text-slate-500">
+                  Masuk sebagai <strong className="text-slate-800">{user.email}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => logout()}
+                  className="w-full sm:w-auto px-4 py-2 rounded-lg bg-rose-50 text-[#E11D48] hover:bg-rose-100 text-xs font-semibold transition-colors text-center flex items-center justify-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[16px]">logout</span>
+                  Keluar dari Sesi Ini (Logout)
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="text-xs text-slate-500">
+                  Belum masuk. Masuk untuk mengamankan data Anda.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsLoginModalOpen(true)}
+                  className="w-full sm:w-auto px-4 py-2 rounded-lg bg-[#0F172A] hover:bg-[#1E293B] text-white text-xs font-semibold transition-colors text-center flex items-center justify-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[16px]">login</span>
+                  Masuk dengan Google
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

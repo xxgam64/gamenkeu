@@ -1,4 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { User, onAuthStateChanged } from 'firebase/auth';
+import {
+  collection,
+  doc,
+  setDoc,
+  deleteDoc,
+  getDocs,
+} from 'firebase/firestore';
 import {
   ScreenId,
   Transaction,
@@ -7,6 +15,14 @@ import {
   SinkingFund,
   UpcomingBill,
 } from '../types/finance';
+import {
+  auth,
+  db,
+  loginWithGoogle,
+  logoutUser,
+  handleFirestoreError,
+  OperationType,
+} from '../lib/firebase';
 
 interface ToastMessage {
   id: string;
@@ -16,13 +32,22 @@ interface ToastMessage {
 }
 
 interface FinanceContextType {
+  // Auth
+  user: User | null;
+  isAuthLoading: boolean;
+  login: () => Promise<void>;
+  logout: () => Promise<void>;
+  isLoginModalOpen: boolean;
+  setIsLoginModalOpen: (open: boolean) => void;
+
+  // Navigation & View
   currentScreen: ScreenId;
   setCurrentScreen: (screen: ScreenId) => void;
   selectedPeriod: string;
   setSelectedPeriod: (period: string) => void;
   viewMode: 'konsolidasi' | 'arus-kas' | 'audit-fiskal';
   setViewMode: (mode: 'konsolidasi' | 'arus-kas' | 'audit-fiskal') => void;
-  
+
   // Data
   transactions: Transaction[];
   assets: PortfolioAsset[];
@@ -31,12 +56,12 @@ interface FinanceContextType {
   dividends: DividendRecord[];
 
   // Mutators
-  addTransaction: (tx: Omit<Transaction, 'id'>) => void;
-  deleteTransaction: (id: string) => void;
-  updateAssetValuation: (id: string, newCurrentValue: number, newUnitPrice?: number) => void;
-  addAsset: (asset: Omit<PortfolioAsset, 'id' | 'unrealizedGain' | 'unrealizedGainPercent'>) => void;
-  addSinkingFund: (fund: Omit<SinkingFund, 'id' | 'statusNote'>) => void;
-  payBill: (id: string) => void;
+  addTransaction: (tx: Omit<Transaction, 'id'>) => Promise<void>;
+  deleteTransaction: (id: string) => Promise<void>;
+  updateAssetValuation: (id: string, newCurrentValue: number, newUnitPrice?: number) => Promise<void>;
+  addAsset: (asset: Omit<PortfolioAsset, 'id' | 'unrealizedGain' | 'unrealizedGainPercent'>) => Promise<void>;
+  addSinkingFund: (fund: Omit<SinkingFund, 'id' | 'statusNote'>) => Promise<void>;
+  payBill: (id: string) => Promise<void>;
   syncCalendar: () => void;
 
   // Modals & UI controls
@@ -205,7 +230,7 @@ const INITIAL_ASSETS: PortfolioAsset[] = [
     currentUnitPrice: 10300,
     unrealizedGain: 7250000,
     unrealizedGainPercent: 16.38,
-    badgeColor: 'bg-navy-light text-white',
+    badgeColor: 'bg-slate-900 text-white',
   },
   {
     id: 'ast-2',
@@ -221,7 +246,7 @@ const INITIAL_ASSETS: PortfolioAsset[] = [
     currentUnitPrice: 1030000,
     unrealizedGain: 750000,
     unrealizedGainPercent: 3.0,
-    badgeColor: 'bg-emerald-700 text-white',
+    badgeColor: 'bg-[#006C4A] text-white',
   },
   {
     id: 'ast-3',
@@ -378,31 +403,18 @@ const INITIAL_DIVIDENDS: DividendRecord[] = [
 ];
 
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+
   const [currentScreen, setCurrentScreen] = useState<ScreenId>('ringkasan-keuangan');
   const [selectedPeriod, setSelectedPeriod] = useState<string>('oct-2024');
   const [viewMode, setViewMode] = useState<'konsolidasi' | 'arus-kas' | 'audit-fiskal'>('konsolidasi');
 
-  // Load from localStorage or defaults
-  const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    const saved = localStorage.getItem('gam_transactions');
-    return saved ? JSON.parse(saved) : INITIAL_TRANSACTIONS;
-  });
-
-  const [assets, setAssets] = useState<PortfolioAsset[]>(() => {
-    const saved = localStorage.getItem('gam_assets');
-    return saved ? JSON.parse(saved) : INITIAL_ASSETS;
-  });
-
-  const [sinkingFunds, setSinkingFunds] = useState<SinkingFund[]>(() => {
-    const saved = localStorage.getItem('gam_sinking_funds');
-    return saved ? JSON.parse(saved) : INITIAL_SINKING_FUNDS;
-  });
-
-  const [upcomingBills, setUpcomingBills] = useState<UpcomingBill[]>(() => {
-    const saved = localStorage.getItem('gam_upcoming_bills');
-    return saved ? JSON.parse(saved) : INITIAL_BILLS;
-  });
-
+  const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
+  const [assets, setAssets] = useState<PortfolioAsset[]>(INITIAL_ASSETS);
+  const [sinkingFunds, setSinkingFunds] = useState<SinkingFund[]>(INITIAL_SINKING_FUNDS);
+  const [upcomingBills, setUpcomingBills] = useState<UpcomingBill[]>(INITIAL_BILLS);
   const [dividends] = useState<DividendRecord[]>(INITIAL_DIVIDENDS);
 
   // Modal states
@@ -414,22 +426,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Toast state
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-
-  useEffect(() => {
-    localStorage.setItem('gam_transactions', JSON.stringify(transactions));
-  }, [transactions]);
-
-  useEffect(() => {
-    localStorage.setItem('gam_assets', JSON.stringify(assets));
-  }, [assets]);
-
-  useEffect(() => {
-    localStorage.setItem('gam_sinking_funds', JSON.stringify(sinkingFunds));
-  }, [sinkingFunds]);
-
-  useEffect(() => {
-    localStorage.setItem('gam_upcoming_bills', JSON.stringify(upcomingBills));
-  }, [upcomingBills]);
 
   const showToast = (title: string, message: string, type: 'success' | 'info' | 'warning' = 'success') => {
     const id = Date.now().toString();
@@ -443,42 +439,180 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  const addTransaction = (newTx: Omit<Transaction, 'id'>) => {
+  // Listen to Firebase Auth state
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setUser(firebaseUser);
+      setIsAuthLoading(false);
+
+      if (firebaseUser) {
+        // Sync user profile
+        try {
+          const userRef = doc(db, 'users', firebaseUser.uid);
+          await setDoc(
+            userRef,
+            {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email || '',
+              displayName: firebaseUser.displayName || 'Pengguna GamMenkeu',
+              photoURL: firebaseUser.photoURL || '',
+              updatedAt: new Date().toISOString(),
+            },
+            { merge: true }
+          );
+
+          // Fetch user transactions
+          const txCol = collection(db, 'users', firebaseUser.uid, 'transactions');
+          const txSnap = await getDocs(txCol);
+
+          if (!txSnap.empty) {
+            const loadedTx: Transaction[] = [];
+            txSnap.forEach((d) => loadedTx.push(d.data() as Transaction));
+            setTransactions(loadedTx);
+          } else {
+            // First time user: seed starter transactions for their personal cloud store
+            for (const item of INITIAL_TRANSACTIONS) {
+              await setDoc(doc(db, 'users', firebaseUser.uid, 'transactions', item.id), item);
+            }
+            setTransactions(INITIAL_TRANSACTIONS);
+          }
+
+          // Fetch user assets
+          const astCol = collection(db, 'users', firebaseUser.uid, 'assets');
+          const astSnap = await getDocs(astCol);
+          if (!astSnap.empty) {
+            const loadedAst: PortfolioAsset[] = [];
+            astSnap.forEach((d) => loadedAst.push(d.data() as PortfolioAsset));
+            setAssets(loadedAst);
+          } else {
+            for (const item of INITIAL_ASSETS) {
+              await setDoc(doc(db, 'users', firebaseUser.uid, 'assets', item.id), item);
+            }
+            setAssets(INITIAL_ASSETS);
+          }
+
+          // Fetch user sinking funds
+          const sfCol = collection(db, 'users', firebaseUser.uid, 'sinkingFunds');
+          const sfSnap = await getDocs(sfCol);
+          if (!sfSnap.empty) {
+            const loadedSf: SinkingFund[] = [];
+            sfSnap.forEach((d) => loadedSf.push(d.data() as SinkingFund));
+            setSinkingFunds(loadedSf);
+          } else {
+            for (const item of INITIAL_SINKING_FUNDS) {
+              await setDoc(doc(db, 'users', firebaseUser.uid, 'sinkingFunds', item.id), item);
+            }
+            setSinkingFunds(INITIAL_SINKING_FUNDS);
+          }
+
+          showToast('Selamat Datang!', `Berhasil masuk sebagai ${firebaseUser.displayName || firebaseUser.email}. Data tersimpan di akun Anda.`);
+        } catch (err) {
+          console.warn('Error loading user data from Firestore:', err);
+        }
+      } else {
+        // Fallback to local storage if not logged in
+        const savedTx = localStorage.getItem('gam_transactions');
+        if (savedTx) setTransactions(JSON.parse(savedTx));
+        const savedAst = localStorage.getItem('gam_assets');
+        if (savedAst) setAssets(JSON.parse(savedAst));
+        const savedSf = localStorage.getItem('gam_sinking_funds');
+        if (savedSf) setSinkingFunds(JSON.parse(savedSf));
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const login = async () => {
+    try {
+      await loginWithGoogle();
+      setIsLoginModalOpen(false);
+    } catch (err: any) {
+      if (err?.code !== 'auth/popup-closed-by-user') {
+        showToast('Gagal Masuk', err?.message || 'Terjadi kesalahan saat masuk.', 'warning');
+      }
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await logoutUser();
+      setUser(null);
+      setTransactions(INITIAL_TRANSACTIONS);
+      setAssets(INITIAL_ASSETS);
+      setSinkingFunds(INITIAL_SINKING_FUNDS);
+      showToast('Berhasil Keluar', 'Anda kini menggunakan mode tamu (Demo).', 'info');
+    } catch (err: any) {
+      showToast('Gagal Keluar', err?.message || 'Gagal keluar sesi.', 'warning');
+    }
+  };
+
+  const addTransaction = async (newTx: Omit<Transaction, 'id'>) => {
     const id = `tx-${Date.now()}`;
     const tx: Transaction = { ...newTx, id };
     setTransactions((prev) => [tx, ...prev]);
+
+    if (user) {
+      try {
+        const path = `users/${user.uid}/transactions/${id}`;
+        await setDoc(doc(db, 'users', user.uid, 'transactions', id), tx);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.CREATE, `users/${user.uid}/transactions/${id}`);
+      }
+    } else {
+      localStorage.setItem('gam_transactions', JSON.stringify([tx, ...transactions]));
+    }
+
     showToast(
       'Transaksi Tersimpan',
-      `${tx.title} sebesar Rp ${tx.amount.toLocaleString('id-ID')} telah dicatat ke Buku Kas.`
+      `${tx.title} sebesar Rp ${tx.amount.toLocaleString('id-ID')} telah dicatat.`
     );
   };
 
-  const deleteTransaction = (id: string) => {
+  const deleteTransaction = async (id: string) => {
     setTransactions((prev) => prev.filter((t) => t.id !== id));
-    showToast('Transaksi Dihapus', 'Entri berhasil dihapus dari Buku Kas.', 'info');
+    if (user) {
+      try {
+        await deleteDoc(doc(db, 'users', user.uid, 'transactions', id));
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, `users/${user.uid}/transactions/${id}`);
+      }
+    }
+    showToast('Transaksi Dihapus', 'Entri berhasil dihapus.', 'info');
   };
 
-  const updateAssetValuation = (id: string, newCurrentValue: number, newUnitPrice?: number) => {
+  const updateAssetValuation = async (id: string, newCurrentValue: number, newUnitPrice?: number) => {
+    let updatedAsset: PortfolioAsset | undefined;
     setAssets((prev) =>
       prev.map((item) => {
         if (item.id === id) {
           const gain = newCurrentValue - item.investedCapital;
           const percent = Number(((gain / item.investedCapital) * 100).toFixed(2));
-          return {
+          updatedAsset = {
             ...item,
             currentValue: newCurrentValue,
             currentUnitPrice: newUnitPrice ?? item.currentUnitPrice,
             unrealizedGain: gain,
             unrealizedGainPercent: percent,
           };
+          return updatedAsset;
         }
         return item;
       })
     );
+
+    if (user && updatedAsset) {
+      try {
+        await setDoc(doc(db, 'users', user.uid, 'assets', id), updatedAsset);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}/assets/${id}`);
+      }
+    }
+
     showToast('Valuasi Diperbarui', 'Nilai pasar portofolio terbaru berhasil dikalkulasi ulang.');
   };
 
-  const addAsset = (data: Omit<PortfolioAsset, 'id' | 'unrealizedGain' | 'unrealizedGainPercent'>) => {
+  const addAsset = async (data: Omit<PortfolioAsset, 'id' | 'unrealizedGain' | 'unrealizedGainPercent'>) => {
     const gain = data.currentValue - data.investedCapital;
     const percent = Number(((gain / data.investedCapital) * 100).toFixed(2));
     const newAsset: PortfolioAsset = {
@@ -488,10 +622,19 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       unrealizedGainPercent: percent,
     };
     setAssets((prev) => [...prev, newAsset]);
+
+    if (user) {
+      try {
+        await setDoc(doc(db, 'users', user.uid, 'assets', newAsset.id), newAsset);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.CREATE, `users/${user.uid}/assets/${newAsset.id}`);
+      }
+    }
+
     showToast('Instrumen Didaftarkan', `${data.name} berhasil ditambahkan ke portofolio.`);
   };
 
-  const addSinkingFund = (data: Omit<SinkingFund, 'id' | 'statusNote'>) => {
+  const addSinkingFund = async (data: Omit<SinkingFund, 'id' | 'statusNote'>) => {
     const percent = (data.currentAmount / data.targetAmount) * 100;
     const statusNote = percent >= 100 ? 'Dana Siap di Rekening Kas' : `${percent.toFixed(1)}% Terpenuhi`;
     const newFund: SinkingFund = {
@@ -500,19 +643,28 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       statusNote,
     };
     setSinkingFunds((prev) => [...prev, newFund]);
+
+    if (user) {
+      try {
+        await setDoc(doc(db, 'users', user.uid, 'sinkingFunds', newFund.id), newFund);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.CREATE, `users/${user.uid}/sinkingFunds/${newFund.id}`);
+      }
+    }
+
     showToast(
       'Rencana Dana Ditambahkan',
       `${data.name} dengan target Rp ${data.targetAmount.toLocaleString('id-ID')} tersimpan.`
     );
   };
 
-  const payBill = (id: string) => {
+  const payBill = async (id: string) => {
     setUpcomingBills((prev) =>
       prev.map((b) => (b.id === id ? { ...b, isPaid: true } : b))
     );
     const bill = upcomingBills.find((b) => b.id === id);
     if (bill) {
-      addTransaction({
+      await addTransaction({
         date: new Date().toISOString().split('T')[0],
         time: '12:00 WIB',
         title: bill.title,
@@ -532,12 +684,18 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const syncCalendar = () => {
-    showToast('Sinkronisasi Berhasil', 'Jadwal jatuh tempo tagihan tersinkronisasi dengan 4 rekening bank.');
+    showToast('Sinkronisasi Berhasil', 'Jadwal jatuh tempo tagihan tersinkronisasi.');
   };
 
   return (
     <FinanceContext.Provider
       value={{
+        user,
+        isAuthLoading,
+        login,
+        logout,
+        isLoginModalOpen,
+        setIsLoginModalOpen,
         currentScreen,
         setCurrentScreen,
         selectedPeriod,

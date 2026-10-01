@@ -8,7 +8,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpenMobile, onCloseMobile }) => {
-  const { currentScreen, setCurrentScreen, showToast } = useFinance();
+  const { currentScreen, setCurrentScreen, user, logout, setIsLoginModalOpen } = useFinance();
 
   const navItems: { id: ScreenId; label: string; icon: string }[] = [
     { id: 'ringkasan-keuangan', label: 'Ringkasan Keuangan', icon: 'grid_view' },
@@ -24,9 +24,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpenMobile, onCloseMobile })
     onCloseMobile();
   };
 
-  const handleLogout = (e: React.MouseEvent) => {
+  const handleLogout = async (e: React.MouseEvent) => {
     e.preventDefault();
-    showToast('Sesi Terkunci', 'Data sesi Anda tetap tersimpan dengan aman di penyimpanan lokal.', 'info');
+    await logout();
   };
 
   return (
@@ -122,15 +122,72 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpenMobile, onCloseMobile })
           </nav>
         </div>
 
-        {/* Bottom Session Logout */}
-        <div className="p-4 border-t border-[#E2E8F0]/60">
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-[#45464d] hover:bg-[#FFF1F2] hover:text-[#E11D48] transition-colors font-medium text-[13.5px]"
-          >
-            <span className="material-symbols-outlined text-[20px]">logout</span>
-            <span>Keluar Sesi</span>
-          </button>
+        {/* Bottom Session Auth Area */}
+        <div className="p-4 border-t border-[#E2E8F0]/60 space-y-2">
+          {user ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2.5 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100">
+                {user.photoURL ? (
+                  <img
+                    src={user.photoURL}
+                    alt={user.displayName || 'Avatar'}
+                    className="w-7 h-7 rounded-full object-cover shrink-0"
+                  />
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-[#131B2E] text-white flex items-center justify-center font-bold text-[11px] shrink-0">
+                    {user.displayName ? user.displayName.slice(0, 1).toUpperCase() : 'U'}
+                  </div>
+                )}
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="text-[12px] font-semibold text-[#0b1c30] truncate leading-tight">
+                    {user.displayName || 'Pengguna'}
+                  </span>
+                  <span className="text-[10px] text-emerald-600 font-medium flex items-center gap-1 leading-tight">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    Cloud Terhubung
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-[#E11D48] hover:bg-[#FFF1F2] transition-colors font-medium text-[12.5px]"
+              >
+                <span className="material-symbols-outlined text-[18px]">logout</span>
+                <span>Keluar Akun</span>
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="px-2 py-1 text-[11px] text-slate-500 bg-slate-50 rounded-lg border border-slate-100 flex items-center justify-between">
+                <span>Mode: Tamu (Lokal)</span>
+                <span className="w-2 h-2 rounded-full bg-amber-400" title="Offline/Lokal"></span>
+              </div>
+              <button
+                onClick={() => setIsLoginModalOpen(true)}
+                className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-lg bg-[#0F172A] hover:bg-[#1E293B] text-white transition-all font-semibold text-[13px] shadow-xs active:scale-[0.98]"
+              >
+                <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.16 0 9.98 0 12s.45 3.84 1.25 5.42l4.03-3.15z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                  />
+                </svg>
+                <span>Masuk Akun</span>
+              </button>
+            </div>
+          )}
         </div>
       </aside>
     </>
