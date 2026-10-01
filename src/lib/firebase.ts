@@ -7,16 +7,29 @@ import {
   User,
 } from 'firebase/auth';
 import {
+  initializeFirestore,
   getFirestore,
   doc,
   getDocFromServer,
+  setLogLevel,
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 
+// Set Firestore log level to avoid benign transient connection retries flooding console
+setLogLevel('error');
+
 // CRITICAL: Firestore must be initialized with firestoreDatabaseId from config
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// Use experimentalForceLongPolling to ensure reliable connections across iframes, proxies, and restricted networks
+export const db = initializeFirestore(
+  app,
+  {
+    experimentalForceLongPolling: true,
+  },
+  firebaseConfig.firestoreDatabaseId
+) || getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
@@ -76,8 +89,16 @@ export async function testConnection(): Promise<void> {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn('Firebase connection: client appears offline or connecting.');
+    if (error instanceof Error) {
+      if (
+        error.message.includes('the client is offline') ||
+        (error as any).code === 'unavailable' ||
+        error.message.includes('could not be completed')
+      ) {
+        console.warn('Firebase connection: operating in resilient offline/polling mode.');
+      } else {
+        console.warn('Firebase test connection notice:', error.message);
+      }
     }
   }
 }
