@@ -1,0 +1,6 @@
+{
+  "name": "GamMenkeu - Sistem Finansial Mandiri",
+  "description": "Sistem finansial mandiri enterprise untuk pencatatan buku kas, analisis anggaran 50/30/20, manajemen portofolio aset, dan perencanaan dana tagihan.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
