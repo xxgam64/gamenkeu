@@ -2,9 +2,38 @@ import React, { useState } from 'react';
 import { useFinance } from '../context/FinanceContext';
 
 export const PremiumAccountScreen: React.FC = () => {
-  const { setIsCertificateModalOpen, setIsExportModalOpen, showToast, user, logout, setIsLoginModalOpen } = useFinance();
+  const {
+    setIsCertificateModalOpen,
+    setIsExportModalOpen,
+    showToast,
+    user,
+    userProfile,
+    logout,
+    setIsLoginModalOpen,
+  } = useFinance();
+
+  const activeUser = user
+    ? {
+        displayName: user.displayName,
+        email: user.email,
+        uid: user.uid,
+        photoURL: user.photoURL,
+        badge: 'Firebase Cloud Aktif',
+        storageType: 'Firestore Cloud Mandiri',
+      }
+    : userProfile
+    ? {
+        displayName: userProfile.displayName,
+        email: userProfile.email,
+        uid: userProfile.uid,
+        photoURL: userProfile.photoURL,
+        badge: 'Profil Mandiri Aktif',
+        storageType: 'Penyimpanan Mandiri Terisolasi',
+      }
+    : null;
+
   const [copied, setCopied] = useState(false);
-  const licenseKey = user ? `GM-PRO-${user.uid.slice(0, 8).toUpperCase()}-2024` : 'GM-ENT-2024-94821-X99Q-VAL';
+  const licenseKey = activeUser ? `GM-PRO-${activeUser.uid.slice(0, 8).toUpperCase()}-2024` : 'GM-ENT-2024-94821-X99Q-VAL';
 
   const copyLicenseKey = () => {
     navigator.clipboard.writeText(licenseKey);
@@ -59,26 +88,26 @@ export const PremiumAccountScreen: React.FC = () => {
       <div className="relative overflow-hidden rounded-xl bg-white p-6 shadow-xs border border-[#E2E8F0]/70">
         <div className="relative z-10 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
           <div className="flex items-start sm:items-center gap-4">
-            {user?.photoURL ? (
+            {activeUser?.photoURL ? (
               <img
-                src={user.photoURL}
-                alt={user.displayName || 'Avatar'}
+                src={activeUser.photoURL}
+                alt={activeUser.displayName || 'Avatar'}
                 className="w-14 h-14 rounded-xl object-cover ring-2 ring-[#10B981]/30 shrink-0 shadow-xs"
               />
             ) : (
               <div className="w-14 h-14 rounded-xl bg-[#0F172A] text-white flex items-center justify-center shadow-xs shrink-0 font-bold text-xl">
-                {user?.displayName ? user.displayName.slice(0, 2).toUpperCase() : 'GM'}
+                {activeUser?.displayName ? activeUser.displayName.slice(0, 2).toUpperCase() : 'GM'}
               </div>
             )}
             <div className="flex flex-col">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="font-['Plus_Jakarta_Sans'] text-lg font-bold text-[#0b1c30]">
-                  {user ? (user.displayName || 'Pengguna Terverifikasi') : 'Mode Tamu (Lokal)'}
+                  {activeUser ? (activeUser.displayName || 'Pengguna Terverifikasi') : 'Mode Tamu (Lokal)'}
                 </h2>
-                {user ? (
+                {activeUser ? (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-[#006C4A] text-[11px] font-bold border border-emerald-200">
                     <span className="material-symbols-outlined text-[14px]">check_circle</span>
-                    Firebase Cloud Sync Aktif (Multi-User)
+                    {activeUser.badge}
                   </span>
                 ) : (
                   <button
@@ -86,24 +115,24 @@ export const PremiumAccountScreen: React.FC = () => {
                     className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-xs transition-colors"
                   >
                     <span className="material-symbols-outlined text-[14px]">login</span>
-                    Masuk dengan Google
+                    Masuk Akun / Multi-User
                   </button>
                 )}
               </div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 mt-1">
                 <span className="flex items-center gap-1">
                   <span className="material-symbols-outlined text-[15px] text-slate-400">mail</span>
-                  {user?.email || 'Belum masuk akun (Data tersimpan di browser)'}
+                  {activeUser?.email || 'Belum masuk akun (Data tersimpan di browser)'}
                 </span>
                 <span>•</span>
                 <span className="flex items-center gap-1">
                   <span className="material-symbols-outlined text-[15px] text-slate-400">tag</span>
-                  ID Pengguna: <span className="font-mono text-slate-800 font-semibold">{user ? user.uid.slice(0, 14) : 'GUEST-LOCAL'}</span>
+                  ID Pengguna: <span className="font-mono text-slate-800 font-semibold">{activeUser ? activeUser.uid.slice(0, 14) : 'GUEST-LOCAL'}</span>
                 </span>
                 <span>•</span>
                 <span className="flex items-center gap-1">
                   <span className="material-symbols-outlined text-[15px] text-slate-400">cloud</span>
-                  Penyimpanan: {user ? 'Firestore Cloud Mandiri' : 'Local Storage'}
+                  Penyimpanan: {activeUser ? activeUser.storageType : 'Local Storage'}
                 </span>
               </div>
             </div>
@@ -481,10 +510,10 @@ export const PremiumAccountScreen: React.FC = () => {
           </div>
 
           <div className="pt-3 border-t border-[#E2E8F0]/60 flex flex-col sm:flex-row items-center justify-between gap-2">
-            {user ? (
+            {activeUser ? (
               <>
                 <span className="text-xs text-slate-500">
-                  Masuk sebagai <strong className="text-slate-800">{user.email}</strong>
+                  Masuk sebagai <strong className="text-slate-800">{activeUser.email}</strong> ({activeUser.displayName})
                 </span>
                 <button
                   type="button"

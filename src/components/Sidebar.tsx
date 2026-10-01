@@ -8,7 +8,30 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpenMobile, onCloseMobile }) => {
-  const { currentScreen, setCurrentScreen, user, logout, setIsLoginModalOpen } = useFinance();
+  const {
+    currentScreen,
+    setCurrentScreen,
+    user,
+    userProfile,
+    logout,
+    setIsLoginModalOpen,
+  } = useFinance();
+
+  const activeUser = user
+    ? {
+        displayName: user.displayName,
+        email: user.email,
+        photoURL: user.photoURL,
+        badge: 'Cloud Terhubung',
+      }
+    : userProfile
+    ? {
+        displayName: userProfile.displayName,
+        email: userProfile.email,
+        photoURL: userProfile.photoURL,
+        badge: 'Profil Mandiri Aktif',
+      }
+    : null;
 
   const navItems: { id: ScreenId; label: string; icon: string }[] = [
     { id: 'ringkasan-keuangan', label: 'Ringkasan Keuangan', icon: 'grid_view' },
@@ -124,27 +147,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpenMobile, onCloseMobile })
 
         {/* Bottom Session Auth Area */}
         <div className="p-4 border-t border-[#E2E8F0]/60 space-y-2">
-          {user ? (
+          {activeUser ? (
             <div className="space-y-2">
               <div className="flex items-center gap-2.5 px-2 py-1 bg-slate-50 rounded-lg border border-slate-100">
-                {user.photoURL ? (
+                {activeUser.photoURL ? (
                   <img
-                    src={user.photoURL}
-                    alt={user.displayName || 'Avatar'}
+                    src={activeUser.photoURL}
+                    alt={activeUser.displayName || 'Avatar'}
                     className="w-7 h-7 rounded-full object-cover shrink-0"
                   />
                 ) : (
                   <div className="w-7 h-7 rounded-full bg-[#131B2E] text-white flex items-center justify-center font-bold text-[11px] shrink-0">
-                    {user.displayName ? user.displayName.slice(0, 1).toUpperCase() : 'U'}
+                    {activeUser.displayName ? activeUser.displayName.slice(0, 1).toUpperCase() : 'U'}
                   </div>
                 )}
                 <div className="flex flex-col min-w-0 flex-1">
                   <span className="text-[12px] font-semibold text-[#0b1c30] truncate leading-tight">
-                    {user.displayName || 'Pengguna'}
+                    {activeUser.displayName || 'Pengguna'}
                   </span>
                   <span className="text-[10px] text-emerald-600 font-medium flex items-center gap-1 leading-tight">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                    Cloud Terhubung
+                    {activeUser.badge}
                   </span>
                 </div>
               </div>

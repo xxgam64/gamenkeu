@@ -31,11 +31,25 @@ interface ToastMessage {
   type?: 'success' | 'info' | 'warning';
 }
 
+export interface AppUserProfile {
+  uid: string;
+  displayName: string;
+  email: string;
+  photoURL?: string;
+  provider: 'local' | 'google';
+  createdAt: string;
+}
+
 interface FinanceContextType {
-  // Auth
+  // Auth & Profiles
   user: User | null;
+  userProfile: AppUserProfile | null;
+  savedProfiles: AppUserProfile[];
   isAuthLoading: boolean;
   login: () => Promise<void>;
+  loginWithProfile: (name: string, email: string) => Promise<void>;
+  switchProfile: (profile: AppUserProfile) => void;
+  deleteSavedProfile: (uid: string) => void;
   logout: () => Promise<void>;
   isLoginModalOpen: boolean;
   setIsLoginModalOpen: (open: boolean) => void;
@@ -404,6 +418,23 @@ const INITIAL_DIVIDENDS: DividendRecord[] = [
 
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<AppUserProfile | null>(() => {
+    try {
+      const active = localStorage.getItem('gam_active_profile');
+      return active ? JSON.parse(active) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [savedProfiles, setSavedProfiles] = useState<AppUserProfile[]>(() => {
+    try {
+      const saved = localStorage.getItem('gam_saved_profiles');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
@@ -416,6 +447,89 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [sinkingFunds, setSinkingFunds] = useState<SinkingFund[]>(INITIAL_SINKING_FUNDS);
   const [upcomingBills, setUpcomingBills] = useState<UpcomingBill[]>(INITIAL_BILLS);
   const [dividends] = useState<DividendRecord[]>(INITIAL_DIVIDENDS);
+
+  // Helper to load user profile data
+  const loadProfileData = (uid: string) => {
+    try {
+      const savedTx = localStorage.getItem(`gam_tx_${uid}`);
+      if (savedTx) {
+        setTransactions(JSON.parse(savedTx));
+      } else {
+        setTransactions(INITIAL_TRANSACTIONS);
+        localStorage.setItem(`gam_tx_${uid}`, JSON.stringify(INITIAL_TRANSACTIONS));
+      }
+
+      const savedAst = localStorage.getItem(`gam_ast_${uid}`);
+      if (savedAst) {
+        setAssets(JSON.parse(savedAst));
+      } else {
+        setAssets(INITIAL_ASSETS);
+        localStorage.setItem(`gam_ast_${uid}`, JSON.stringify(INITIAL_ASSETS));
+      }
+
+      const savedSf = localStorage.getItem(`gam_sf_${uid}`);
+      if (savedSf) {
+        setSinkingFunds(JSON.parse(savedSf));
+      } else {
+        setSinkingFunds(INITIAL_SINKING_FUNDS);
+        localStorage.setItem(`gam_sf_${uid}`, JSON.stringify(INITIAL_SINKING_FUNDS));
+      }
+    } catch (e) {
+      console.warn('Error loading profile data:', e);
+    }
+  };
+
+  // Login with instant user profile (Works on GitHub Pages for everyone!)
+  const loginWithProfile = async (name: string, email: string) => {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim() || 'Pengguna';
+    const uid = 'usr_' + btoa(cleanEmail).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16);
+
+    const profile: AppUserProfile = {
+      uid,
+      displayName: cleanName,
+      email: cleanEmail,
+      provider: 'local',
+      createdAt: new Date().toISOString(),
+    };
+
+    setUserProfile(profile);
+    localStorage.setItem('gam_active_profile', JSON.stringify(profile));
+
+    setSavedProfiles((prev) => {
+      const filtered = prev.filter((p) => p.uid !== uid);
+      const updated = [profile, ...filtered];
+      localStorage.setItem('gam_saved_profiles', JSON.stringify(updated));
+      return updated;
+    });
+
+    loadProfileData(uid);
+    setIsLoginModalOpen(false);
+    showToast(
+      'Berhasil Masuk',
+      `Selamat datang, ${cleanName}! Sesi buku kas Anda aktif dan tersimpan.`
+    );
+  };
+
+  const switchProfile = (profile: AppUserProfile) => {
+    setUserProfile(profile);
+    localStorage.setItem('gam_active_profile', JSON.stringify(profile));
+    loadProfileData(profile.uid);
+    setIsLoginModalOpen(false);
+    showToast('Beralih Profil', `Sekarang menggunakan akun ${profile.displayName}.`);
+  };
+
+  const deleteSavedProfile = (uid: string) => {
+    setSavedProfiles((prev) => {
+      const updated = prev.filter((p) => p.uid !== uid);
+      localStorage.setItem('gam_saved_profiles', JSON.stringify(updated));
+      return updated;
+    });
+    if (userProfile?.uid === uid) {
+      logout();
+    }
+    showToast('Profil Dihapus', 'Profil telah dihapus dari daftar tersimpan.', 'info');
+  };
 
   // Modal states
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
@@ -528,39 +642,60 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       await loginWithGoogle();
       setIsLoginModalOpen(false);
     } catch (err: any) {
-      if (err?.code !== 'auth/popup-closed-by-user') {
-        showToast('Gagal Masuk', err?.message || 'Terjadi kesalahan saat masuk.', 'warning');
+      if (err?.code === 'auth/popup-closed-by-user') {
+        return;
       }
+
+      let errorTitle = 'Gagal Masuk';
+      let errorMsg = err?.message || 'Terjadi kesalahan saat masuk.';
+
+      if (err?.message?.includes('identity-toolkit-api') || err?.message?.includes('identitytoolkit.googleapis.com')) {
+        errorTitle = 'API Auth Belum Aktif';
+        errorMsg = 'Layanan Google Identity Platform belum aktif di Google Cloud Console. Silakan aktifkan Identity Toolkit API pada konsol pengembang proyek.';
+      } else if (err?.code === 'auth/unauthorized-domain') {
+        errorTitle = 'Domain Belum Diotorisasi';
+        errorMsg = 'Domain GitHub Pages belum ditambahkan ke daftar Authorized Domains di Firebase Authentication Settings.';
+      } else if (err?.code === 'auth/popup-blocked') {
+        errorTitle = 'Popup Terblokir';
+        errorMsg = 'Jendela popup Google Sign-In diblokir browser. Izinkan popup untuk melanjutkan.';
+      }
+
+      showToast(errorTitle, errorMsg, 'warning');
+      throw err;
     }
   };
 
   const logout = async () => {
     try {
       await logoutUser();
-      setUser(null);
-      setTransactions(INITIAL_TRANSACTIONS);
-      setAssets(INITIAL_ASSETS);
-      setSinkingFunds(INITIAL_SINKING_FUNDS);
-      showToast('Berhasil Keluar', 'Anda kini menggunakan mode tamu (Demo).', 'info');
-    } catch (err: any) {
-      showToast('Gagal Keluar', err?.message || 'Gagal keluar sesi.', 'warning');
-    }
+    } catch {}
+    setUser(null);
+    setUserProfile(null);
+    localStorage.removeItem('gam_active_profile');
+    setTransactions(INITIAL_TRANSACTIONS);
+    setAssets(INITIAL_ASSETS);
+    setSinkingFunds(INITIAL_SINKING_FUNDS);
+    showToast('Berhasil Keluar', 'Anda kini menggunakan mode tamu (Demo).', 'info');
   };
 
   const addTransaction = async (newTx: Omit<Transaction, 'id'>) => {
     const id = `tx-${Date.now()}`;
     const tx: Transaction = { ...newTx, id };
-    setTransactions((prev) => [tx, ...prev]);
+    const nextTx = [tx, ...transactions];
+    setTransactions(nextTx);
 
     if (user) {
       try {
-        const path = `users/${user.uid}/transactions/${id}`;
         await setDoc(doc(db, 'users', user.uid, 'transactions', id), tx);
       } catch (error) {
         handleFirestoreError(error, OperationType.CREATE, `users/${user.uid}/transactions/${id}`);
       }
+    }
+
+    if (userProfile) {
+      localStorage.setItem(`gam_tx_${userProfile.uid}`, JSON.stringify(nextTx));
     } else {
-      localStorage.setItem('gam_transactions', JSON.stringify([tx, ...transactions]));
+      localStorage.setItem('gam_transactions', JSON.stringify(nextTx));
     }
 
     showToast(
@@ -570,13 +705,19 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteTransaction = async (id: string) => {
-    setTransactions((prev) => prev.filter((t) => t.id !== id));
+    const nextTx = transactions.filter((t) => t.id !== id);
+    setTransactions(nextTx);
     if (user) {
       try {
         await deleteDoc(doc(db, 'users', user.uid, 'transactions', id));
       } catch (error) {
         handleFirestoreError(error, OperationType.DELETE, `users/${user.uid}/transactions/${id}`);
       }
+    }
+    if (userProfile) {
+      localStorage.setItem(`gam_tx_${userProfile.uid}`, JSON.stringify(nextTx));
+    } else {
+      localStorage.setItem('gam_transactions', JSON.stringify(nextTx));
     }
     showToast('Transaksi Dihapus', 'Entri berhasil dihapus.', 'info');
   };
@@ -691,8 +832,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     <FinanceContext.Provider
       value={{
         user,
+        userProfile,
+        savedProfiles,
         isAuthLoading,
         login,
+        loginWithProfile,
+        switchProfile,
+        deleteSavedProfile,
         logout,
         isLoginModalOpen,
         setIsLoginModalOpen,

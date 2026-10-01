@@ -13,6 +13,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileSidebar }) => {
     currentScreen,
     showToast,
     user,
+    userProfile,
     logout,
     setIsLoginModalOpen,
   } = useFinance();
@@ -20,6 +21,24 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileSidebar }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+
+  const activeUser = user
+    ? {
+        displayName: user.displayName,
+        email: user.email,
+        photoURL: user.photoURL,
+        badge: 'Firebase Cloud Aktif',
+        isCloud: true,
+      }
+    : userProfile
+    ? {
+        displayName: userProfile.displayName,
+        email: userProfile.email,
+        photoURL: userProfile.photoURL,
+        badge: 'Profil Mandiri Aktif',
+        isCloud: false,
+      }
+    : null;
 
   const notifications = [
     {
@@ -181,37 +200,37 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileSidebar }) => {
         </button>
 
         {/* Login or User Profile Lockup */}
-        {user ? (
+        {activeUser ? (
           <div className="relative">
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
               className="flex items-center gap-2.5 pl-2 sm:pl-3 border-l border-[#E2E8F0] hover:opacity-90 transition-opacity text-left"
               type="button"
             >
-              {user.photoURL ? (
+              {activeUser.photoURL ? (
                 <img
-                  src={user.photoURL}
-                  alt={user.displayName || 'Avatar'}
+                  src={activeUser.photoURL}
+                  alt={activeUser.displayName || 'Avatar'}
                   className="w-8 h-8 rounded-full object-cover ring-2 ring-[#10B981]/30 shrink-0"
                 />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-[#131B2E] text-white flex items-center justify-center font-bold text-[12px] shadow-xs shrink-0">
-                  {user.displayName
-                    ? user.displayName.slice(0, 2).toUpperCase()
-                    : user.email
-                    ? user.email.slice(0, 2).toUpperCase()
+                  {activeUser.displayName
+                    ? activeUser.displayName.slice(0, 2).toUpperCase()
+                    : activeUser.email
+                    ? activeUser.email.slice(0, 2).toUpperCase()
                     : 'U'}
                 </div>
               )}
               <div className="hidden sm:flex flex-col text-left">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[12.5px] font-semibold text-[#0b1c30] leading-tight truncate max-w-[120px]">
-                    {user.displayName || 'Pengguna'}
+                    {activeUser.displayName || 'Pengguna'}
                   </span>
-                  <span className="w-2 h-2 rounded-full bg-[#10B981]" title="Cloud Sync Aktif"></span>
+                  <span className="w-2 h-2 rounded-full bg-[#10B981]" title={activeUser.badge}></span>
                 </div>
                 <span className="text-[10px] text-slate-400 leading-tight truncate max-w-[120px]">
-                  {user.email || 'Cloud Sync Aktif'}
+                  {activeUser.email || activeUser.badge}
                 </span>
               </div>
               <span className="material-symbols-outlined text-[16px] text-slate-400 hidden sm:inline">
@@ -224,11 +243,11 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileSidebar }) => {
               <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                 <div className="px-3.5 py-2 border-b border-slate-100">
                   <p className="text-xs font-bold text-slate-900 truncate">
-                    {user.displayName || 'Pengguna GamMenkeu'}
+                    {activeUser.displayName || 'Pengguna GamMenkeu'}
                   </p>
-                  <p className="text-[11px] text-slate-500 truncate">{user.email}</p>
+                  <p className="text-[11px] text-slate-500 truncate">{activeUser.email}</p>
                   <span className="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-[#006C4A] border border-emerald-200">
-                    Firebase Cloud Sync Aktif
+                    {activeUser.badge}
                   </span>
                 </div>
 
